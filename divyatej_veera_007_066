@@ -1,0 +1,111 @@
+//4.3 CODE SNIPPETS
+//The following Java excerpts illustrate how the requirements can be implemented. They are reference snippets for the report and should be reconciled with the team’s final source code before submission.
+//1. Encapsulated Room model
+public class Room {
+    private final int roomNumber;
+    private String category;
+    private double basePrice;
+    private final Set<String> amenities;
+    private boolean occupied;
+
+    public Room(int roomNumber, String category,
+                double basePrice, Set<String> amenities) {
+        if (roomNumber <= 0 || basePrice <= 0)
+            throw new IllegalArgumentException("Invalid room details");
+        this.roomNumber = roomNumber;
+        this.category = category;
+        this.basePrice = basePrice;
+        this.amenities = new HashSet<>(amenities);
+        this.occupied = false;
+    }
+
+    public int getRoomNumber() { return roomNumber; }
+    public String getCategory() { return category; }
+    public double getBasePrice() { return basePrice; }
+    public Set<String> getAmenities() {
+        return Collections.unmodifiableSet(amenities);
+    }
+    public boolean isOccupied() { return occupied; }
+    public void setOccupied(boolean occupied) {
+        this.occupied = occupied;
+    }
+}
+//The fields are private, and the amenities getter returns an unmodifiable view so callers cannot directly modify the internal set.
+//2. Occupancy-based dynamic tariff
+public class DynamicTariffCalculator {
+    public double calculateTariff(double basePrice, double occupancyPercent) {
+        if (occupancyPercent > 85.0) return basePrice * 1.40;
+        if (occupancyPercent > 70.0) return basePrice * 1.20;
+        return basePrice;
+    }
+}
+//The higher threshold is checked first. Therefore, occupancy above 85% receives a 40% increase rather than both increases being added.
+//3. Domain-specific checked exceptions
+public class RoomUnavailableException extends Exception {
+    public RoomUnavailableException(String message) {
+        super(message);
+    }
+}
+
+public class InvalidGuestPreferenceException extends Exception {
+    public InvalidGuestPreferenceException(String message) {
+        super(message);
+    }
+}
+//These checked exceptions distinguish room-capacity failures from invalid guest input.
+// 4.3 CODE SNIPPETS (CONTINUED)
+
+//4. Generic inventory and synchronized reservation operation
+public class HotelReservationService {
+    private final Map<Integer, Room> inventory = new HashMap<>();
+    private final List<Booking> bookings = new ArrayList<>();
+
+    public synchronized Booking reserveRoom(
+            int roomNumber, Guest guest)
+            throws RoomUnavailableException {
+        Room room = inventory.get(roomNumber);
+        if (room == null || room.isOccupied()) {
+            throw new RoomUnavailableException(
+                "Selected room is unavailable");
+        }
+
+        // Availability check and update occur under one lock.
+        room.setOccupied(true);
+        Booking booking = new Booking(guest, room);
+        bookings.add(booking);
+        return booking;
+    }
+}
+//The synchronized method protects the check-and-reserve sequence. In a complete implementation, the service should also validate guest preferences, calculate the current occupancy tariff and handle rollback if booking creation fails.
+//5. Comparator for preference and price ranking
+Comparator<Room> recommendationOrder =
+    Comparator.<Room>comparingInt(
+        room -> preferenceScore(room, guest))
+    .reversed()
+    .thenComparingDouble(
+        room -> tariffCalculator.calculateTariff(
+            room.getBasePrice(), occupancyPercent));
+
+recommendedRooms.sort(recommendationOrder);
+//This comparator ranks rooms with higher preference scores first. When two rooms have the same score, the room with the lower calculated tariff is listed first.
+//6. Efficient string construction
+StringBuilder summary = new StringBuilder();
+summary.append("Recommended rooms: ");
+for (Room room : recommendedRooms) {
+    summary.append(room.getRoomNumber())
+           .append(" - ")
+           .append(room.getCategory())
+           .append("; ");
+}
+System.out.println(summary);
+//StringBuilder avoids repeated immutable String concatenation in the loop. StringBuffer may be selected when a mutable character sequence must be shared across threads, although synchronization is still required for compound operations.
+//7. Waiting list and priority queue declarations
+private final LinkedList<Guest> waitingList = new LinkedList<>();
+private final PriorityQueue<BookingRequest> requestQueue =
+    new PriorityQueue<>(
+        Comparator.comparingInt(BookingRequest::getPriority)
+                  .reversed()
+        .thenComparingLong(BookingRequest::getRequestTime));
+//The waiting list can preserve arrival order, while the priority queue can process higher-priority requests first and use request time as a tie-breaker.
+
+ 
